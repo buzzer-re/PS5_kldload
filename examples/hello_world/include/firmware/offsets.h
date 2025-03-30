@@ -1,0 +1,1 @@
+#define kprintf_offset -0x972588

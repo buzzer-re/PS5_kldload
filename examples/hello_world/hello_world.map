@@ -1,0 +1,126 @@
+
+Merging program properties
+
+
+Discarded input sections
+
+ .text          0x0000000000000000        0x0 build/main.o
+ .data          0x0000000000000000        0x0 build/main.o
+ .bss           0x0000000000000000        0x0 build/main.o
+ .comment       0x0000000000000000       0x2c build/main.o
+ .note.GNU-stack
+                0x0000000000000000        0x0 build/main.o
+ .eh_frame      0x0000000000000000       0x48 build/main.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Linker script and memory map
+
+LOAD build/main.o
+
+.text           0x0000000000000000       0x7b
+ *(.text.module_start)
+ .text.module_start
+                0x0000000000000000       0x5c build/main.o
+                0x0000000000000000                module_start
+ *(.text*)
+ .text.init_kernel
+                0x000000000000005c       0x1f build/main.o
+                0x000000000000005c                init_kernel
+
+.plt            0x0000000000000080        0x0
+ .plt           0x0000000000000080        0x0 build/main.o
+
+.plt.got        0x0000000000000080        0x0
+ .plt.got       0x0000000000000080        0x0 build/main.o
+
+.plt.sec        0x0000000000000080        0x0
+ .plt.sec       0x0000000000000080        0x0 build/main.o
+
+.rodata         0x000000000000007b       0x5c
+ *(.rodata)
+ *(.rodata*)
+ .rodata.module_start.str1.1
+                0x000000000000007b       0x5c build/main.o
+
+.gnu.version_d  0x00000000000000d8        0x0
+ .gnu.version_d
+                0x00000000000000d8        0x0 build/main.o
+
+.gnu.version    0x00000000000000d8        0x0
+ .gnu.version   0x00000000000000d8        0x0 build/main.o
+
+.gnu.version_r  0x00000000000000d8        0x0
+ .gnu.version_r
+                0x00000000000000d8        0x0 build/main.o
+
+.dynsym         0x00000000000000d8       0x18
+ .dynsym        0x00000000000000d8       0x18 build/main.o
+
+.dynstr         0x00000000000000f0        0x1
+ .dynstr        0x00000000000000f0        0x1 build/main.o
+
+.gnu.hash       0x00000000000000f8       0x1c
+ .gnu.hash      0x00000000000000f8       0x1c build/main.o
+
+.sframe         0x0000000000000114        0x0
+ .sframe        0x0000000000000114        0x0 build/main.o
+ .sframe        0x0000000000000114        0x0 build/main.o
+
+.eh_frame_hdr   0x0000000000000114        0x0
+ .eh_frame_hdr  0x0000000000000114        0x0 build/main.o
+
+.note.gnu.property
+                0x0000000000000118       0x20
+ .note.gnu.property
+                0x0000000000000118       0x20 build/main.o
+
+.rela.dyn       0x0000000000000138        0x0
+ .rela.plt      0x0000000000000138        0x0 build/main.o
+ .rela.got      0x0000000000000138        0x0 build/main.o
+ .rela.bss      0x0000000000000138        0x0 build/main.o
+ .rela.data.rel.ro
+                0x0000000000000138        0x0 build/main.o
+ .rela.ifunc    0x0000000000000138        0x0 build/main.o
+
+.data
+ *(.data)
+
+.dynamic        0x0000000000000138       0xe0
+ .dynamic       0x0000000000000138       0xe0 build/main.o
+                0x0000000000000138                _DYNAMIC
+
+.got            0x0000000000000218        0x0
+ .got           0x0000000000000218        0x0 build/main.o
+
+.got.plt        0x0000000000000218        0x0
+ .got.plt       0x0000000000000218        0x0 build/main.o
+
+.data.rel.ro    0x0000000000000218        0x0
+ .data.rel.ro   0x0000000000000218        0x0 build/main.o
+
+.bss
+ *(.bss)
+
+.bss.kdata_address
+                0x0000000000000218        0x8
+ .bss.kdata_address
+                0x0000000000000218        0x8 build/main.o
+                0x0000000000000218                kdata_address
+
+.bss.kprintf    0x0000000000000220        0x8
+ .bss.kprintf   0x0000000000000220        0x8 build/main.o
+                0x0000000000000220                kprintf
+
+.dynbss         0x0000000000000228        0x0
+ .dynbss        0x0000000000000228        0x0 build/main.o
+
+/DISCARD/
+ *(.comment)
+ *(.note.GNU-stack)
+ *(.eh_frame)
+ *(.interp)
+OUTPUT(hello_world.elf elf64-x86-64)

@@ -1,0 +1,4 @@
+*.elf
+.vscode/
+*.bin
+*.o

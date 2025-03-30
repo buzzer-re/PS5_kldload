@@ -1,0 +1,97 @@
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <ps5/payload.h>
+#include <ps5/klog.h>
+#include <ps5/kernel.h>
+
+extern uint64_t kmem_alloc(size_t size);
+extern int kekcall(uint64_t* dr);
+extern int kproc_create(uint64_t addr, uint64_t args, uint64_t kproc_name);
+
+#define  CRASH() uint8_t(*p)() = NULL; p() // crash with page fault
+
+#define kprintf_offset -0x972588
+
+typedef struct __kproc_args
+{
+    uint64_t kdata_base;
+} kproc_args;
+
+inline uint64_t __readmsr(uint32_t msr) // wrapper into the rdmsr instruction
+{
+    uint32_t low, high;
+    asm volatile("rdmsr" : "=a"(low), "=d"(high) : "c"(msr));
+
+    return (low | ((uint64_t) high << 32));
+}
+
+
+int exec_test(kproc_args* args)
+{   
+    uint64_t kdata_address = args->kdata_base;
+
+    void(*kprintf)(char* fmt, ...) = (void(*)(char*, ...)) kdata_address + kprintf_offset;
+
+    char msg[15];
+    msg[0] = 'H';
+    msg[1] = 'e';
+    msg[2] = 'l';
+    msg[3] = 'l';
+    msg[4] = 'o';
+    msg[5] = ' ';
+    msg[6] = 'k';
+    msg[7] = 'e';
+    msg[8] = 'r';
+    msg[9] = 'n';
+    msg[10] = 'e';
+    msg[11] = 'l';
+    msg[12] = '\n';
+    msg[13] = '\x00';
+
+    kprintf(msg);
+
+    return 10;
+}
+
+
+int maffin(int argc, char const *argv[])
+{
+    payload_args_t* args = payload_get_args();
+    kproc_args kargs;
+
+    kargs.kdata_base = args->kdata_base_addr;
+
+    puts("Allocating kernel exec memory...");
+
+    uint64_t ret =  kmem_alloc(0x4000);
+    uint64_t kproc_name = kmem_alloc(0x40000);
+    uint64_t kproc_args = kmem_alloc(0x40000);
+
+    
+    puts("copying 'exec_test' into kernel land...");
+    kernel_copyin(exec_test, ret, 0x100);
+    kernel_copyin("kproc_test\x00", kproc_name, 12);
+    kernel_copyin(&kargs, kproc_args, sizeof(kargs));
+
+
+    uint8_t code[0x100] = {0};
+
+    kernel_copyout(ret, code, 0x100);
+
+    puts("copied code: ");
+    for (int i = 0; i < 0x100; ++i)
+    {
+        printf("%02x ", code[i]);
+    }
+
+    puts("\nLaunching kproc...");
+
+    int proc = kproc_create(ret, kproc_args, kproc_name);
+
+    printf("proc => %d\n", proc);
+
+    puts("Done");
+
+    return 0;
+}
