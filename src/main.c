@@ -7,6 +7,7 @@
 #include "../include/proc.h"
 #include "../include/server.h"
 #include "../include/notify.h"
+#include "../include/kstuff_loader.h"
 
 #define DEBUG 1
 #define PORT 9022
@@ -23,6 +24,7 @@ typedef struct __kproc_args
 
 extern uint64_t kmem_alloc(size_t size);
 extern int kproc_create(uint64_t addr, uint64_t args, uint64_t kproc_name);
+extern int kstuff_check();
 
 void _kldload(int fd, void* data, ssize_t data_size)
 {
@@ -74,6 +76,12 @@ int main(int argc, char const *argv[])
             printf("Unable to kill %d\n", existing_instance->pid);
             return 1;
         }
+    }
+
+    if (kstuff_check() != 0)
+    {
+        puts("Loading kstuff...");
+        load_kstuff();
     }
 
     syscall(SYS_thr_set_name, -1, THREAD_NAME);

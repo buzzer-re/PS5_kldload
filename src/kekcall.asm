@@ -2,6 +2,7 @@
 .global kmem_alloc
 .global kekcall
 .global kproc_create
+.global kstuff_check
 
 kekcall:
     mov rax, 0x100000027
@@ -19,5 +20,11 @@ kmem_alloc:
 
 kproc_create:
     mov rax, 0x700000027
+    syscall
+    ret
+
+
+kstuff_check:
+    mov rax, 0xffffffff00000027
     syscall
     ret

@@ -9,16 +9,24 @@ else
 endif
 
 CFLAGS := -Wall -Werror
+KSTUFF_PATH := playstation_research_utils/ps5_kernel_research/kstuff-no-fpkg/ps5-kstuff/
 
-all: kldload.elf
+all: payload_bin.c kldload.elf
+
+payload_bin.c: $(KSTUFF_PATH)
+	make -C $^
+	@cp $^/payload.bin payload.bin
+	@xxd -i payload.bin | sed 's/\bunsigned\b/static unsigned/g' > src/$@
 
 kldload.elf:
+	@rm -f *.o *.elf
 	$(CC) -o $@ src/*.c src/*.asm -O0
 	strip $@
 	
-clean:
-	rm -f payload_bin.c *.o *.elf
+clean: $(KSTUFF_PATH)
+	make clean -C $^
+	rm -f *.o *.elf
 
-test: kekcall.elf
+test: kldload.elf
 	$(PS5_DEPLOY) -h $(PS5_HOST) -p $(PS5_PORT) $^
 
