@@ -3,7 +3,6 @@
 This is a kernel module loader for the PlayStation 5 that aims to provide a deeper understanding of the system's internals and assist in my research into its internals.
 
 The hypervisor remains active and untouched, but the kernel modules run normally and in harmony with it.
-How It Works
 
 ## How It Works
 
