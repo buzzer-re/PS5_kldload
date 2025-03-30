@@ -13,12 +13,11 @@ typedef unsigned int uint32_t;
 static inline __attribute__((always_inline)) uint64_t __readmsr(unsigned long __register) {
     unsigned long __edx;
     unsigned long __eax;
-    __asm__("rdmsr"
+    __asm__ volatile("rdmsr"
             : "=d"(__edx), "=a"(__eax)
             : "c"(__register));
     return (((uint64_t)__edx) << 32) | (uint64_t)__eax;
 }
-
 
 static inline __attribute__((always_inline)) uint64_t __readcr0(void) {
     uint64_t cr0;

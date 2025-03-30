@@ -1,18 +1,18 @@
 #include "../include/firmware/offsets.h"
-#include "../include/firmware/intrin.h"
+// #include "../include/firmware/intrin.h"
 
 #define MSR_LSTAR 0xC0000082
 typedef unsigned long  uint64_t;
 typedef unsigned int uint32_t;
 
 
-// inline uint64_t __readmsr(uint32_t msr) // wrapper into the rdmsr instruction
-// {
-//     uint32_t low, high;
-//     __asm__("rdmsr" : "=a"(low), "=d"(high) : "c"(msr));
+inline uint64_t __readmsr(uint32_t msr) // wrapper into the rdmsr instruction
+{
+    uint32_t low, high;
+    __asm__("rdmsr" : "=a"(low), "=d"(high) : "c"(msr));
 
-//     return (low | ((uint64_t) high << 32));
-// }
+    return (low | ((uint64_t) high << 32));
+}
 
 typedef struct __kproc_args
 {
@@ -43,5 +43,5 @@ int module_start(kproc_args* args)
 
     // kprintf("Let's read the kprintf: %x\n", kprintf_addr[0]); // crash the HV
 
-    return 0;
+    return 1;
 }
