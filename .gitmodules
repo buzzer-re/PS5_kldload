@@ -1,3 +1,4 @@
 [submodule "playstation_research_utils"]
 	path = playstation_research_utils
 	url = https://github.com/buzzer-re/playstation_research_utils.git
+	branch = main
