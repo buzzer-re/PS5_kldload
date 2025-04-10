@@ -112,11 +112,4 @@ Here's a few things that I'm currently working and need assistance for anyone wi
 - Crashes mapping
     - There are a few operations that can crash the system, such as read the `CR0` register, they are mostly caused by the Hypervisor
 
-- Overall stability
-    - This tool can crash sometimes and it's may be related to the `kproc_create` arguments, this is something that need investigation.
-
-
-
-
-
 
