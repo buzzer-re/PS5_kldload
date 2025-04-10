@@ -73,6 +73,7 @@ int start_server(int port, void(*callback)(int fd, void* data, ssize_t data_size
         close(conn);
         free(read_data);
         read_data = NULL;
+        total_len = 0;
     }
 
     close(sock_fd);
