@@ -49,7 +49,7 @@ pt_load(const void* image, void* base, Elf64_Phdr *phdr) {
 }
 
 
-int load_kstuff() {
+int load_r0gdb(r0gdb_functions* r0_func) {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr*)payload_bin;
     Elf64_Phdr *phdr = (Elf64_Phdr*)(payload_bin + ehdr->e_phoff);
     Elf64_Shdr *shdr = (Elf64_Shdr*)(payload_bin + ehdr->e_shoff);
@@ -108,11 +108,14 @@ int load_kstuff() {
         perror("malloc");
         return EXIT_FAILURE;
     }
+    // printf("r0gdb_init: %llx\n", r0gdb_functions.r0gdb_init_ptr);
 
     memcpy(hacky_args, args, sizeof(payload_args_t));
     uintptr_t* hack = (uintptr_t*)(hacky_args + sizeof(payload_args_t));
     *hack = (uintptr_t)&kernel_dynlib_dlsym;
+    *(++hack) = (uintptr_t) r0_func;
 
+    // printf("r0gdb_functions: %llx\n", &r0gdb_functions);    
     entry(hacky_args);
 
     // if(*args->payloadout == 0) {

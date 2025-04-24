@@ -1,4 +1,6 @@
 *.elf
+test.sh
+*.i64
 .vscode/
 *.bin
 *.o

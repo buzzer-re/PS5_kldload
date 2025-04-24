@@ -24,6 +24,7 @@ kldload.elf:
 	strip $@
 	
 clean: $(KSTUFF_PATH)
+	make clean -C playstation_research_utils/ps5_kernel_research/kstuff-no-fpkg/prosper0gdb
 	make clean -C $^
 	rm -f *.o *.elf
 
