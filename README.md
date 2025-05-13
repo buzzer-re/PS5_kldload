@@ -54,7 +54,7 @@ It will listen on port 9022 and launch any kernel payloads in kernel mode.
 
 Using the dev branch:
 
-`git clone --recursive https://github.com/buzzer-re/PS5_kldload.git`
+`git clone https://github.com/buzzer-re/PS5_kldload.git`
 
 Change the branch:
 
