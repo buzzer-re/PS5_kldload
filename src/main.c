@@ -1,13 +1,14 @@
-#include <stdio.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <elf.h>
-#include <signal.h>
-
 #include "../include/proc.h"
 #include "../include/server.h"
 #include "../include/notify.h"
 #include "../include/kstuff_loader.h"
+
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <unistd.h>
+#include <elf.h>
+#include <signal.h>
 
 #define DEBUG 1
 #define PORT 9022
@@ -19,6 +20,7 @@
 typedef struct __kproc_args
 {
     uint64_t kdata_base;
+    uint32_t fw_ver;
 } kproc_args;
 
 
@@ -28,6 +30,16 @@ extern int kstuff_check();
 
 
 r0gdb_functions r0gdb;
+
+uint32_t get_fw_version()
+{
+    int mib[2] = {1, 46};
+    unsigned long size = sizeof(mib);
+    unsigned int version = 0;
+    sysctl(mib, 2, &version, &size, 0, 0);
+    return version >> 16;
+}
+
 
 void _kldload(int fd, void* data, ssize_t data_size)
 {
@@ -50,6 +62,8 @@ void _kldload(int fd, void* data, ssize_t data_size)
     payload_args_t* payload_args = payload_get_args();
     kproc_args args;
     args.kdata_base = payload_args->kdata_base_addr;
+    args.fw_ver = get_fw_version();
+
     //
     // Kernel write
     // 
@@ -59,7 +73,7 @@ void _kldload(int fd, void* data, ssize_t data_size)
 
     printf("Lauching kthread at %#02lx...\n", exec_code);
 
-    r0gdb.r0gdb_kfncall(exec_code, kthread_args, kproc_name);
+    r0gdb.r0gdb_kproc_create(exec_code, kthread_args, kproc_name);
 }
 
 
@@ -86,46 +100,12 @@ int main(int argc, char const *argv[])
         return 1;
     }
 
-    // printf("Trying kmalloc at %llx...\n", r0gdb.r0gdb_kmalloc);
-    // sleep(1);
-    uint64_t kmem = r0gdb.r0gdb_kmem_alloc(0x100);
-    printf("Allocated mem at %lx\n", kmem);
-    // printf("Calling kfunction...\n");
-    uint64_t buff = 0xc3000000b3b8;
-    uint8_t dump[8] = {0};
-    
-    kernel_copyin(&buff, kmem, sizeof(buff));
-    kernel_copyout(kmem, dump, 8);
-    printf("Allocated mem at %lx\n", kmem);
-    printf("Calling kfunction...\n");
-    for (int i = 0; i < 8; ++i)
-    {
-        printf("%#02x ", dump[i]);
-    }
-
-    puts("");
-    // sleep(2);
-    int ret = r0gdb.r0gdb_kfncall(kmem);
-    
-    printf("Ret: %d\n", ret);
-    // struct sigaction sa;
-    // sigaction(SIGBUS, 0, &sa);
-    // sigaction(SIGTRAP, &sa, 0);
-
-    puts("Done!");
-    syscall(SYS_thr_set_name, -1, THREAD_NAME);
-    //     //restore the gdb_stub's SIGTRAP handler
-    // struct sigaction sa;
-    // sigaction(SIGBUS, 0, &sa);
-    // sigaction(SIGTRAP, &sa, 0);
-    // notify_send("Starting kldload on %d...", PORT);
-
     if (start_server(PORT, _kldload) <= 0)
     {
         notify_send("Unable to initialize kldload server on port %d! Aborting...", PORT);
         return 1;
     }
 
-    while (1);
+    // while (1);
     return 0;
 }

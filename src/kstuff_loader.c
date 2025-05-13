@@ -114,10 +114,8 @@ int load_r0gdb(r0gdb_functions* r0_func) {
     uintptr_t* hack = (uintptr_t*)(hacky_args + sizeof(payload_args_t));
     *hack = (uintptr_t)&kernel_dynlib_dlsym;
     *(++hack) = (uintptr_t) r0_func;
-
-    // printf("r0gdb_functions: %llx\n", &r0gdb_functions);    
+    
     entry(hacky_args);
-
     // if(*args->payloadout == 0) {
     //     puts("patching app.db");
     //     *args->payloadout = patch_app_db();
