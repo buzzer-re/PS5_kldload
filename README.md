@@ -48,6 +48,26 @@ Then, you can build and run the tool with:
 > make clean && make && make test
 
 It will listen on port 9022 and launch any kernel payloads in kernel mode.
+
+
+## Using the dev branch
+
+Using the dev branch:
+
+`git clone --recursive https://github.com/buzzer-re/PS5_kldload.git`
+
+Change the branch:
+
+`git checkout dev`
+
+Init the submdule
+
+`git submodule init && git submodule update`
+
+Edit your PS5 IP address in Makefile and build it:
+
+`make clean && make && make test`
+
 ## Example
 
 Kernel payloads can be written similarly to how they were written for the PlayStation 4. In the future, an SDK might be developed to assist with this. Below is a simple [hello_world](https://github.com/buzzer-re/PS5_kldload/tree/main/examples/hello_world) example that reads the `MSR_LSTAR` value. Full source code can be found here.
