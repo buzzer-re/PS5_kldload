@@ -33,7 +33,19 @@ This tool was created primarily for firmware version 4.03, but it can be extende
 
 Currently supported firmware:
 
+- 3.0
+- 3.10
+- 3.20
+- 3.21
 - 4.03
+- 4.51
+- 5.0
+- 5.02
+- 5.10
+- 5.50
+- 6.0
+- 6.02
+- 6.50
 
 # Building and Using
 
