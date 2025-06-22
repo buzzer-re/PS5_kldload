@@ -29,11 +29,11 @@ Once that is done, it’s simply a matter of creating another kekcall to invoke 
 
 ## Supported Firmware
 
-This tool was created primarily for firmware version 4.03, but it can be extended by acquiring the correct offsets used in the kekcall.c file.
-
 Currently supported firmware:
 
 - 4.03
+
+For more supported firwmares, use the the [dev](https://github.com/buzzer-re/PS5_kldload/tree/dev) branch.
 
 # Building and Using
 
