@@ -37,8 +37,6 @@ Currently supported firmware:
 - 6.50
 
 
-For more supported firwmares, use the the [dev](https://github.com/buzzer-re/PS5_kldload/tree/dev) branch.
-
 # Building and Using
 
 Make sure to have the latest version of the [SDK](https://github.com/ps5-payload-dev/sdk) installed.
