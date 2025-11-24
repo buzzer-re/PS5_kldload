@@ -6,30 +6,19 @@ The hypervisor remains active and untouched, but the kernel modules run normally
 
 ## How It Works
 
-This tool is the result of deep research into the system, assisted by [kstuff](https://github.com/buzzer-re/playstation_research_utils/tree/dc5a29fa289321cc983e8560a054f6e5207ec1af/ps5_kernel_research/kstuff-no-fpkg). It is made possible by the creation of two new [kekcalls](src/kekcall.asm) (a communication interface between userland and kstuff) to create executable memory in the kernel and launch kthreads (kernel threads).
+On PlayStation 4 systems, developers were able to patch the running kernel to force it to always allocate read-write-executable memory areas in the kmem_alloc function. On the PlayStation 5, things are a bit different, with a few caveats, such as the Hypervisor, that prevent .text read/write access due to `XOM` and the assumption that `GMET` is enabled.
 
-On PlayStation 4 systems, developers were able to patch the running kernel to force it to always allocate read-write-executable memory areas in the kmem_alloc function. On the PlayStation 5, things are a bit different, with a few caveats, such as the Hypervisor, that prevent .text read/write access due to the XOM.
+GMET (Guest Mode Execute) is an AMD technology used by its hypervisor to specifically control which pages can execute at the guest level. When it is enabled and properly configured, the guest cannot request executable pages or execute code outside the allowed area. The PlayStation 5 lacks this configuration until firmware `6.50`. kldload works by requesting such pages, writing code into them using the kernel read/write primitives, and executing it as a real kthread, thus allowing real kernel-level code execution on the device.
 
-However, kstuff doesn’t patch the kernel. Instead, it uses kernel read/write (RW) primitives to register itself in the Interrupt Descriptor Table (IDT) to capture general protection faults (int13) and debug traps (int1). With the necessary gadgets, it can also read and write to the debug registers. To modify the kernel code, it sets specific breakpoints in the kernel and then modifies the register state to achieve the desired behavior. This is how important patches, such as the mprotect patch (which enables PROT_EXEC protection in userland), have been applied.
+To call functions and so on, one can use r0gdb or kstuff. However, neither patches the kernel. Instead, they use kernel read/write (RW) primitives to register themselves in the Interrupt Descriptor Table (IDT) to capture general protection faults (int13) and debug traps (int1). With the necessary gadgets, they can also read and write to the debug registers.
 
-To make the kernel memory allocation work, one must first replicate the same fix in the kmem_alloc function.
+Using kstuff to request RWX kernel pages involves setting specific breakpoints in the kernel’s `kmem_alloc` function and then, prior to allocation, changing the default RW permissions to RWX. This is similar to how important patches such as the mprotect patch (which enables `PROT_EXEC` protection in userland) have been applied.
 
-## Calling Kernel Functions
+Using the `r0gdb` implementation is different: a tracer is set up when calling kmem_alloc, and it will trace for a specific [condition](https://github.com/buzzer-re/playstation_research_utils/blob/622b09b8433884d06514f8021dfc92ffac863389/ps5_kernel_research/kstuff-no-fpkg/prosper0gdb/r0gdb.c#L1103) that happens prior the page allocation, and then it will change it to `RWX` executable. 
 
-Kstuff introduces a concept called kekcalls, which are encoded function calls inside the RAX register when userland performs a syscall. When hooking all system calls in the #GP handler, it will verify if the getppid syscall is being called (or any other syscall with no arguments and which isn’t called frequently). It will then extract the kekcall number from the upper bits of the RAX register, since the syscall number is stored in EAX.
-
-This makes it easy to extend kstuff with more kekcalls. For example, I created the kmalloc and kproc_create kekcalls, which internally adjust the arguments and change the RIP to point to these functions.
-
-
-## Memory Allocation and Kernel Patches
-
-`kmalloc` is not the initial target. It will eventually call kmem_alloc if the current malloc [arena](https://www.rfleury.com/p/untangling-lifetimes-the-arena-allocator) is smaller than the requested size. This is a difficult situation to achieve, so the first "patch" is used to force kmalloc to request more memory by setting a breakpoint into the arena size check. This triggers the second patch, kmem_alloc_rw_fix, which replaces the default permissions of PROT_READ|PROT_WRITE with [PROT_READ|PROT_WRITE|PROT_EXEC](https://github.com/buzzer-re/playstation_research_utils/blob/dc5a29fa289321cc983e8560a054f6e5207ec1af/ps5_kernel_research/kstuff-no-fpkg/ps5-kstuff/uelf/kekcall.c#L37).
-
-Once that is done, it’s simply a matter of creating another kekcall to invoke `kproc_create`, which will create a new kthread.
+`r0gdb` is the primary supported method of this project, as it is simpler and does not require forcing the system to trigger a `#GP` on every syscall attempt. The only caveat at the moment is that loaders such as `elfldr` may experience undefined behavior; this is currently on the debugging/fixing backlog. Even so, if kstuff is loaded into the system prior to kldload, it will check whether the necessary kekcalls are implemented. If they are, it will use the currently running kstuff module over the r0gdb. 
 
 ## Supported Firmware
-
-This tool was created primarily for firmware version 4.03, but it can be extended by acquiring the correct offsets used in the kekcall.c file.
 
 Currently supported firmware:
 
@@ -47,6 +36,7 @@ Currently supported firmware:
 - 6.02
 - 6.50
 
+
 # Building and Using
 
 Make sure to have the latest version of the [SDK](https://github.com/ps5-payload-dev/sdk) installed.
@@ -61,24 +51,6 @@ Then, you can build and run the tool with:
 
 It will listen on port 9022 and launch any kernel payloads in kernel mode.
 
-
-## Using the dev branch
-
-Using the dev branch:
-
-`git clone https://github.com/buzzer-re/PS5_kldload.git`
-
-Change the branch:
-
-`git checkout dev`
-
-Init the submdule
-
-`git submodule init && git submodule update`
-
-Edit your PS5 IP address in Makefile and build it:
-
-`make clean && make && make test`
 
 ## Example
 
@@ -137,11 +109,3 @@ Here's a few things that I'm currently working and need assistance for anyone wi
     - Similar on how FreeBSD already does, it's good to have a well defined format and loader similar to the current ones
 - Offsets acquiring and function definitions
     - There is a lot of offsets already defined on the [offsets.c](https://github.com/buzzer-re/playstation_research_utils/blob/dc5a29fa289321cc983e8560a054f6e5207ec1af/ps5_kernel_research/kstuff-no-fpkg/prosper0gdb/offsets.c), some of them need a function definition to be used 
-
-- Firmware support
-    - Expand to other firmware is a major achievement, can be done just by acquiring the necessary offsets, acquiring that ones are beyond the scope of that project (pure debugging/reversing)
-
-- Crashes mapping
-    - There are a few operations that can crash the system, such as read the `CR0` register, they are mostly caused by the Hypervisor
-
-
