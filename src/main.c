@@ -32,6 +32,7 @@ extern int kstuff_check();
 
 r0gdb_functions r0gdb;
 int kstuff_loaded;
+int fw_version;
 
 uint32_t get_fw_version()
 {
@@ -42,6 +43,12 @@ uint32_t get_fw_version()
     return version >> 16;
 }
 
+
+int is_kstuff_unsupported()
+{
+    uint64_t exec_code = kmem_alloc(0x100);
+    return (exec_code & 0xff) == getppid();
+}
 
 void _kldload(int fd, void* data, ssize_t data_size)
 {
@@ -77,21 +84,20 @@ void _kldload(int fd, void* data, ssize_t data_size)
     payload_args_t* payload_args = payload_get_args();
     kproc_args args;
     args.kdata_base = payload_args->kdata_base_addr;
-    args.fw_ver = get_fw_version();
+    args.fw_ver = fw_version;
 
     //
     // Kernel write
     // 
     
     puts("Writing data...");
-    sleep(1);
     kernel_copyin(data, exec_code, data_size);
     kernel_copyin(KTHREAD_NAME, kproc_name, sizeof(KTHREAD_NAME));
     kernel_copyin(&args, kthread_args, sizeof(args));
 
 
     printf("Lauching kthread at %#02lx...\n", exec_code);
-    sleep(1);
+
     if (kstuff_loaded)
         kproc_create(exec_code, kthread_args, kproc_name);
     else
@@ -104,6 +110,7 @@ int main(int argc, char const *argv[])
     puts("Starting kldload...");
     struct proc* existing_instance = find_proc_by_name(THREAD_NAME);
     payload_args_t* args = payload_get_args();
+    fw_version = get_fw_version();
 
     if (existing_instance)
     {
@@ -116,24 +123,23 @@ int main(int argc, char const *argv[])
 
     kstuff_loaded = !kstuff_check();
 
-    #ifdef _USE_KSTUFF
-    if (!kstuff_loaded)
+    if (kstuff_loaded && is_kstuff_unsupported())
     {
-        puts("Loading kstuff...");
-        kstuff_loaded = 1;
-        load_r0gdb(NULL); // Null will eventually make kstuff fully load
-        puts("Kstuff loaded, starting...");
-    }
-    #else
-    puts("kstuff is not loaded and kldbuild-nokstuff build detected, loading r0gdb...");
-    load_r0gdb(&r0gdb);
-
-    if (r0gdb.r0gdb_init_ptr(args->sys_dynlib_dlsym, (int) args->rwpair[0], (int) args->rwpair[1], 0, args->kdata_base_addr))
-    {
-        notify_send("Failed to start r0gdb, aborting kldload loading...");
+        char* err_msg = "The current kstuff build is not supported, unload kstuff before use! aborting kldload loading...";
+        puts(err_msg);
+        notify_send(err_msg);
         return 1;
+    } 
+    else
+    {
+        load_r0gdb(&r0gdb);
+        if (r0gdb.r0gdb_init_ptr(args->sys_dynlib_dlsym, (int) args->rwpair[0], (int) args->rwpair[1], 0, args->kdata_base_addr))
+        {
+            notify_send("Failed to start r0gdb, aborting kldload loading...");
+            return 1;
+        }
     }
-    #endif
+
     
     if (start_server(PORT, _kldload) <= 0)
     {
