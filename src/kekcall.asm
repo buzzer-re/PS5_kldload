@@ -17,6 +17,7 @@ kmem_alloc:
     or rax, rbx
     pop rbx
     ret
+    
 
 kproc_create:
     mov rax, 0x700000027

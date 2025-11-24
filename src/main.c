@@ -1,15 +1,17 @@
-#include <stdio.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <elf.h>
-#include <signal.h>
-
 #include "../include/proc.h"
 #include "../include/server.h"
 #include "../include/notify.h"
 #include "../include/kstuff_loader.h"
 
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <unistd.h>
+#include <elf.h>
+#include <signal.h>
+
 #define DEBUG 1
+#define _USE_KSTUFF 1
 #define PORT 9022
 #define THREAD_NAME "kldload.elf"
 #define KTHREAD_NAME "my_kthread\x00"
@@ -19,6 +21,7 @@
 typedef struct __kproc_args
 {
     uint64_t kdata_base;
+    uint32_t fw_ver;
 } kproc_args;
 
 
@@ -26,15 +29,48 @@ extern uint64_t kmem_alloc(size_t size);
 extern int kproc_create(uint64_t addr, uint64_t args, uint64_t kproc_name);
 extern int kstuff_check();
 
+
+r0gdb_functions r0gdb;
+int kstuff_loaded;
+int fw_version;
+
+uint32_t get_fw_version()
+{
+    int mib[2] = {1, 46};
+    unsigned long size = sizeof(mib);
+    unsigned int version = 0;
+    sysctl(mib, 2, &version, &size, 0, 0);
+    return version >> 16;
+}
+
+
+int is_kstuff_unsupported()
+{
+    uint64_t exec_code = kmem_alloc(0x100);
+    return (exec_code & 0xff) == getppid();
+}
+
 void _kldload(int fd, void* data, ssize_t data_size)
 {
     //
     // perform a kekcall to alloc the executable code area
     //
+    uint64_t exec_code;
+    uint64_t kproc_name;
+    uint64_t kthread_args;
     
-    uint64_t exec_code = kmem_alloc(data_size);
-    uint64_t kproc_name = kmem_alloc(0x100); // leave the default prot
-    uint64_t kthread_args = kmem_alloc(sizeof(kproc_args));
+    if (!kstuff_loaded)
+    {
+        exec_code = r0gdb.r0gdb_kmem_alloc(data_size);
+        kproc_name = r0gdb.r0gdb_kmem_alloc(0x100); // leave the default prot
+        kthread_args = r0gdb.r0gdb_kmem_alloc(sizeof(kproc_args));
+    }
+    else
+    {
+        exec_code = kmem_alloc(data_size);
+        kproc_name = kmem_alloc(0x100); // leave the default prot
+        kthread_args = kmem_alloc(sizeof(kproc_args));
+    }
 
     #ifdef DEBUG
 
@@ -48,27 +84,34 @@ void _kldload(int fd, void* data, ssize_t data_size)
     payload_args_t* payload_args = payload_get_args();
     kproc_args args;
     args.kdata_base = payload_args->kdata_base_addr;
+    args.fw_ver = fw_version;
+
     //
     // Kernel write
     // 
     
-    puts("Copying...");
-
+    puts("Writing data...");
     kernel_copyin(data, exec_code, data_size);
     kernel_copyin(KTHREAD_NAME, kproc_name, sizeof(KTHREAD_NAME));
     kernel_copyin(&args, kthread_args, sizeof(args));
 
 
-    puts("Lauching kproc!");
-    
-    kproc_create(exec_code, kthread_args, kproc_name);
+    printf("Lauching kthread at %#02lx...\n", exec_code);
+
+    if (kstuff_loaded)
+        kproc_create(exec_code, kthread_args, kproc_name);
+    else
+        r0gdb.r0gdb_kproc_create(exec_code, kthread_args, kproc_name);
 }
 
 
 int main(int argc, char const *argv[])
 {
+    puts("Starting kldload...");
     struct proc* existing_instance = find_proc_by_name(THREAD_NAME);
-    
+    payload_args_t* args = payload_get_args();
+    fw_version = get_fw_version();
+
     if (existing_instance)
     {
         if (kill(existing_instance->pid, SIGKILL))
@@ -78,20 +121,32 @@ int main(int argc, char const *argv[])
         }
     }
 
-    if (kstuff_check() != 0)
+    kstuff_loaded = !kstuff_check();
+
+    if (kstuff_loaded && is_kstuff_unsupported())
     {
-        puts("Loading kstuff...");
-        load_kstuff();
+        char* err_msg = "The current kstuff build is not supported, unload kstuff before use! aborting kldload loading...";
+        puts(err_msg);
+        notify_send(err_msg);
+        return 1;
+    } 
+    else
+    {
+        load_r0gdb(&r0gdb);
+        if (r0gdb.r0gdb_init_ptr(args->sys_dynlib_dlsym, (int) args->rwpair[0], (int) args->rwpair[1], 0, args->kdata_base_addr))
+        {
+            notify_send("Failed to start r0gdb, aborting kldload loading...");
+            return 1;
+        }
     }
 
-    syscall(SYS_thr_set_name, -1, THREAD_NAME);
-    notify_send("Starting kldload on %d...", PORT);
-
+    
     if (start_server(PORT, _kldload) <= 0)
     {
         notify_send("Unable to initialize kldload server on port %d! Aborting...", PORT);
         return 1;
     }
 
+    // while (1);
     return 0;
 }
