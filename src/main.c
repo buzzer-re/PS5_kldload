@@ -9,6 +9,7 @@
 #include <sys/sysctl.h>
 #include <unistd.h>
 #include <signal.h>
+#include <ps5/klog.h>
 
 #define DEBUG 0
 #define PORT 9022
@@ -36,7 +37,7 @@ uint32_t get_fw_version()
 
 void _kldload(int fd, void* data, ssize_t data_size)
 {
-    printf("kldload: received %zd bytes\n", data_size);
+    klog_printf("kldload: received %zd bytes\n", data_size);
 
     //
     // Allocate kernel pages for code, name, and args
@@ -47,12 +48,12 @@ void _kldload(int fd, void* data, ssize_t data_size)
     uint64_t kthread_args = kprim_kmem_alloc(&g_kp, ROUND_PG(sizeof(kproc_args)));
 
     if (!exec_code || !kproc_name || !kthread_args) {
-        puts("kldload: kmem_alloc failed");
+        klog_puts("kldload: kmem_alloc failed");
         return;
     }
 
 // #ifdef DEBUG
-    printf("kldload: code=%#lx (%zd bytes) name=%#lx args=%#lx\n",
+    klog_printf("kldload: code=%#lx (%zd bytes) name=%#lx args=%#lx\n",
         exec_code, data_size, kproc_name, kthread_args);
 // #endif
 
@@ -60,7 +61,7 @@ void _kldload(int fd, void* data, ssize_t data_size)
     // Mark code pages executable (clear NX in kernel PTEs)
     //
     if (page_mark_exec(g_kp.dmap_base, g_kp.kernel_cr3, exec_code, code_size)) {
-        puts("kldload: mark_exec failed");
+        klog_puts("kldload: mark_exec failed");
         return;
     }
 
@@ -75,37 +76,37 @@ void _kldload(int fd, void* data, ssize_t data_size)
     //
     // Write code, name, and args into kernel memory
     //
-    puts("kldload: writing payload to kernel...");
+    klog_puts("kldload: writing payload to kernel...");
     kernel_copyin(data, exec_code, data_size);
     kernel_copyin(KTHREAD_NAME, kproc_name, sizeof(KTHREAD_NAME));
     kernel_copyin(&args, kthread_args, sizeof(args));
 
-#ifdef DEBUG
+#if DEBUG
     // Readback verification
     uint8_t dump[16] = {0};
-    kernel_copyout(exec_code, dump, sizeof(data));
-    printf("kldload: first 16 bytes: ");
+    kernel_copyout(exec_code, dump, sizeof(dump));
+    klog_printf("kldload: first 16 bytes: ");
     for (int i = 0; i < 16; i++)
-        printf("%02x ", dump[i]);
-    puts("");
+        klog_printf("%02x ", dump[i]);
+    klog_puts("");
 #endif
 
     //
     // Launch kernel thread
     //
-    printf("kldload: launching kthread at %#lx...\n", exec_code);
+    klog_printf("kldload: launching kthread at %#lx...\n", exec_code);
 
     int ret = kprim_kproc_create(&g_kp, exec_code, kthread_args, kproc_name);
-    printf("kldload: kproc_create returned %d\n", ret);
+    klog_printf("kldload: kproc_create returned %d\n", ret);
 
     if (!ret) 
     {
-        puts("kldload: module launched successfully");
+        klog_puts("kldload: module launched successfully");
         notify_send("kldload: module loaded (%zd bytes)", data_size);
     } 
     else 
     {
-        puts("kldload: kproc_create FAILED");
+        klog_puts("kldload: kproc_create FAILED");
         notify_send("kldload: FAILED to load module");
     }
 }
@@ -130,13 +131,13 @@ void _kldload(int fd, void* data, ssize_t data_size)
 int main(int argc, char const *argv[])
 {
     fw_version = get_fw_version();
-    printf("Running on firmware %#x\n", fw_version);
+    klog_printf("Running on firmware %#x\n", fw_version);
 
     // kill previous instance if running
     struct proc* existing = find_proc_by_name("kldload.elf");
     if (existing && existing->pid != getpid())
     {
-        printf("kldload: killing previous instance (pid %d)\n", existing->pid);
+        klog_printf("kldload: killing previous instance (pid %d)\n", existing->pid);
         kill(existing->pid, SIGKILL);
         free(existing);
     }
@@ -144,11 +145,14 @@ int main(int argc, char const *argv[])
     // init kernel primitives
     if (kprim_init(&g_kp, fw_version))
     {
-        puts("kldload: kprim_init failed");
+        klog_puts("kldload: kprim_init failed");
         return 1;
     }
-    
-    printf("kldload ready\nStarting server on %d...\n", PORT);
+
+    // daemonize — detach from loader session
+    daemon(0, 0);
+
+    klog_printf("kldload ready\nStarting server on %d...\n", PORT);
     notify_send("kldload ready at %d\n", PORT);
     start_server(PORT, _kldload);
     kprim_cleanup(&g_kp);

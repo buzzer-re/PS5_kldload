@@ -209,7 +209,8 @@ static const kprim_fw_entry fw_table[] = {
     { 0 }  // sentinel
 };
 
-#define TSS_IST3_OFFSET             0x34
+// IST2 instead of IST3 to avoid conflict with kstuff (uses IST3/IST4/IST7)
+#define TSS_IST_OFFSET              0x2C
 #define TSS_PER_CPU_SIZE            0x68
 #define TSS_NUM_CPUS                16
 
@@ -235,7 +236,7 @@ typedef struct __kprim_ctx
     idt_64   new_gate;
     int      vector;
     uint64_t tss_base;
-    uint64_t orig_ist3[TSS_NUM_CPUS];
+    uint64_t orig_ist[TSS_NUM_CPUS];
     void*    user_page;
     int      initialized;
     uint16_t kernel_cs;

