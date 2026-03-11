@@ -98,7 +98,7 @@ int kprim_init(kprim_ctx* ctx, uint32_t fw_version)
 
     uint64_t vmspace_ptr;
     kernel_copyout(proc_addr + 0x200, &vmspace_ptr, sizeof(vmspace_ptr));
-    kernel_copyout(vmspace_ptr + VMSPACE_PMAP_OFFSET, &user_pmap, sizeof(user_pmap));
+    kernel_copyout(vmspace_ptr + ctx->fw->vmspace_pmap_offset, &user_pmap, sizeof(user_pmap));
 
     uint64_t phys = page_vtophys(ctx->dmap_base, user_pmap.pm_cr3, (uint64_t)page);
     if (!phys)

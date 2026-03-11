@@ -10,9 +10,6 @@
 #define KPTE_NX         (1ULL << 63)
 #define KPTE_ADDR_MASK  0x000FFFFFFFFFF000ULL
 
-// vmspace -> pmap offset (FreeBSD)
-#define VMSPACE_PMAP_OFFSET     0x2E0
-
 typedef struct __flat_pmap
 {
     uint64_t mtx_name_ptr;

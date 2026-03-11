@@ -21,6 +21,7 @@ typedef struct __kprim_fw_entry
     int64_t kmem_alloc;
     int64_t kproc_create;
     int64_t pop_all_iret;
+    int64_t vmspace_pmap_offset;
 } kprim_fw_entry;
 
 static const kprim_fw_entry fw_table[] = {
@@ -35,6 +36,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xC2AA0,
       .kproc_create = -0x3568F0,
       .pop_all_iret = -0x9af01b,
+      .vmspace_pmap_offset = 0x2E0,
     },
     { .fw = 0x320,
       .idt = 0x642dc80,
@@ -44,6 +46,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xC25E0,
       .kproc_create = -0x3565A0,
       .pop_all_iret = -0x9aecdb,
+      .vmspace_pmap_offset = 0x2E0,
     },
     { .fw = 0x321,
       .idt = 0x642dc80,
@@ -53,6 +56,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xC25E0,
       .kproc_create = -0x3565A0,
       .pop_all_iret = -0x9aecdb,
+      .vmspace_pmap_offset = 0x2E0,
     },
 
     //
@@ -66,6 +70,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xc1ed0,
       .kproc_create = -0x35ebf0,
       .pop_all_iret = -0x9cf8ab,
+      .vmspace_pmap_offset = 0x2E0,
     },
     { .fw = 0x451,
       .idt = 0x64cdc80,
@@ -75,6 +80,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xC18E0,
       .kproc_create = -0x35E700,
       .pop_all_iret = -0x9cf8ab,
+      .vmspace_pmap_offset = 0x2E0,
     },
 
     //
@@ -88,6 +94,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xCD1E0,
       .kproc_create = -0x372460,
       .pop_all_iret = -0xa04ff2,
+      .vmspace_pmap_offset = 0x2E0,
     },
     { .fw = 0x502,
       .idt = 0x660dca0,
@@ -97,6 +104,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xCD1E0,
       .kproc_create = -0x372460,
       .pop_all_iret = -0xa04ff2,
+      .vmspace_pmap_offset = 0x2E0,
     },
     { .fw = 0x510,
       .idt = 0x660dca0,
@@ -106,6 +114,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xCCEB0,
       .kproc_create = -0x372290,
       .pop_all_iret = -0xa04ff2,
+      .vmspace_pmap_offset = 0x2E0,
     },
     { .fw = 0x550,
       .idt = 0x660dca0,
@@ -115,6 +124,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xCC0C0,
       .kproc_create = -0x3714A0,
       .pop_all_iret = -0xa05032,
+      .vmspace_pmap_offset = 0x2E0,
     },
 
     //
@@ -128,6 +138,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xC2B50,
       .kproc_create = -0x372DB0,
       .pop_all_iret = -0xa1b872,
+      .vmspace_pmap_offset = 0x2E0,
     },
     { .fw = 0x602,
       .idt = 0x655dde0,
@@ -137,6 +148,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xC2B70,
       .kproc_create = -0x372DD0,
       .pop_all_iret = -0xa1b872,
+      .vmspace_pmap_offset = 0x2E0,
     },
     { .fw = 0x650,
       .idt = 0x655dde0,
@@ -146,6 +158,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xC2440,
       .kproc_create = -0x372B40,
       .pop_all_iret = -0xa1b872,
+      .vmspace_pmap_offset = 0x2E8,  // shifted from 0x2E0 on 6.50+
     },
 
     //
@@ -159,6 +172,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xCF5F0,
       .kproc_create = -0x37B900,
       .pop_all_iret = -0xA0BA92,
+      .vmspace_pmap_offset = 0x2E8,
     },
     { .fw = 0x701,
       .idt = 0x2E7FDF0,
@@ -168,6 +182,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xCF5F0,
       .kproc_create = -0x37B900,
       .pop_all_iret = -0xA0BA92,
+      .vmspace_pmap_offset = 0x2E8,
     },
     { .fw = 0x720,
       .idt = 0x2E7FDF0,
@@ -177,6 +192,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xCE5F0,
       .kproc_create = -0x37B600,
       .pop_all_iret = -0xA0B852,
+      .vmspace_pmap_offset = 0x2E8,
     },
     { .fw = 0x740,
       .idt = 0x2E7FDF0,
@@ -186,6 +202,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xCE5F0,
       .kproc_create = -0x37B600,
       .pop_all_iret = -0xA0B852,
+      .vmspace_pmap_offset = 0x2E8,
     },
     { .fw = 0x760,
       .idt = 0x2E7FDF0,
@@ -195,6 +212,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xCDFE0,
       .kproc_create = -0x37B4C0,
       .pop_all_iret = -0xA0B852,
+      .vmspace_pmap_offset = 0x2E8,
     },
     { .fw = 0x761,
       .idt = 0x2E7FDF0,
@@ -204,6 +222,7 @@ static const kprim_fw_entry fw_table[] = {
       .kmem_alloc = -0xCDFE0,
       .kproc_create = -0x37B4C0,
       .pop_all_iret = -0xA0B852,
+      .vmspace_pmap_offset = 0x2E8,
     },
 
     { 0 }  // sentinel
