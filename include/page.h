@@ -23,6 +23,5 @@ typedef struct __flat_pmap
     uint64_t pm_cr3;
 } flat_pmap;
 
-int page_read_kernel_pmap(uint64_t kdata_base, int64_t off_kernel_pmap_store, uint64_t* dmap_base, uint64_t* kernel_cr3, uint64_t* kernel_pml4);
 uint64_t page_vtophys(uint64_t dmap_base, uint64_t cr3, uint64_t va);
 int page_mark_exec(uint64_t dmap_base, uint64_t kernel_cr3, uint64_t kva, size_t size);

@@ -70,9 +70,15 @@ int kprim_init(kprim_ctx* ctx, uint32_t fw_version)
     // pop_all_iret = POP_FRAME start (15 movq register loads + addq $0xe8,%rsp + iretq)
     ctx->gadget_pop_all_iret = ctx->kdata_base + ctx->fw->pop_all_iret;
 
-    if (page_read_kernel_pmap(ctx->kdata_base, ctx->fw->kernel_pmap_store,
-            &ctx->dmap_base, &ctx->kernel_cr3, &ctx->kernel_pml4))
+    // read kernel pmap directly from known offset
+    flat_pmap kernel_pmap;
+    kernel_copyout(ctx->kdata_base + ctx->fw->kernel_pmap_store, &kernel_pmap, sizeof(kernel_pmap));
+    if (kernel_pmap.pm_pml4 == 0 || kernel_pmap.pm_cr3 == 0)
         return -1;
+
+    ctx->kernel_pml4 = kernel_pmap.pm_pml4;
+    ctx->kernel_cr3 = kernel_pmap.pm_cr3;
+    ctx->dmap_base = kernel_pmap.pm_pml4 - kernel_pmap.pm_cr3;
 
     void* page = mmap(NULL, 0x4000, PROT_READ | PROT_WRITE | PROT_EXEC,
         MAP_PRIVATE | MAP_ANON, -1, 0);
