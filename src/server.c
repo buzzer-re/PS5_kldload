@@ -16,31 +16,40 @@ int start_server(int port, void(*callback)(int fd, void* data, ssize_t data_size
 
 
 
-    if ((sock_fd = socket(AF_INET, SOCK_STREAM, 0) ) == 0)
+    sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_fd < 0)
     {
+        printf("socket() failed: %d\n", sock_fd);
         return -1;
     }
-    
+//    printf("socket fd: %d\n", sock_fd);
+
+    int optval = 1;
+    setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    setsockopt(sock_fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
     addr.sin_port = htons(port);
 
     if (bind(sock_fd, (struct sockaddr*) &addr, sizeof(addr)) < 0)
     {
+        perror("bind failed");
         return -1;
     }
-    
-    
+    // puts("bind ok");
 
     if (listen(sock_fd, 1) < 0)
     {
+        perror("listen failed");
         return -1;
     }
+    // puts("listen ok");
 
 
     while (1)
     {
-        printf("Waiting connections...\n");
+        // printf("Waiting connections...\n");
         conn = accept(sock_fd, (struct sockaddr*) &addr, (socklen_t*) &socklen);
 
         if (conn < 0)
