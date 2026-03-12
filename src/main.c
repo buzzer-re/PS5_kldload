@@ -1,19 +1,18 @@
 #include "../include/proc.h"
 #include "../include/server.h"
 #include "../include/notify.h"
-#include "../include/kstuff_loader.h"
+#include "../include/kprim.h"
+#include "../include/page.h"
 
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
-#include <elf.h>
 #include <signal.h>
+#include <ps5/klog.h>
 
-#define DEBUG 1
-#define _USE_KSTUFF 1
+#define DEBUG 0
 #define PORT 9022
-#define THREAD_NAME "kldload.elf"
 #define KTHREAD_NAME "my_kthread\x00"
 #define PAGE_SIZE 0x4000
 #define ROUND_PG(x) (((x) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
@@ -24,14 +23,7 @@ typedef struct __kproc_args
     uint32_t fw_ver;
 } kproc_args;
 
-
-extern uint64_t kmem_alloc(size_t size);
-extern int kproc_create(uint64_t addr, uint64_t args, uint64_t kproc_name);
-extern int kstuff_check();
-
-
-r0gdb_functions r0gdb;
-int kstuff_loaded;
+kprim_ctx g_kp;
 int fw_version;
 
 uint32_t get_fw_version()
@@ -43,110 +35,126 @@ uint32_t get_fw_version()
     return version >> 16;
 }
 
-
-int is_kstuff_unsupported()
-{
-    uint64_t exec_code = kmem_alloc(0x100);
-    return (exec_code & 0xff) == getppid();
-}
-
 void _kldload(int fd, void* data, ssize_t data_size)
 {
+    klog_printf("kldload: received %zd bytes\n", data_size);
+
     //
-    // perform a kekcall to alloc the executable code area
+    // Allocate kernel pages for code, name, and args
     //
-    uint64_t exec_code;
-    uint64_t kproc_name;
-    uint64_t kthread_args;
-    
-    if (!kstuff_loaded)
-    {
-        exec_code = r0gdb.r0gdb_kmem_alloc(data_size);
-        kproc_name = r0gdb.r0gdb_kmem_alloc(0x100); // leave the default prot
-        kthread_args = r0gdb.r0gdb_kmem_alloc(sizeof(kproc_args));
-    }
-    else
-    {
-        exec_code = kmem_alloc(data_size);
-        kproc_name = kmem_alloc(0x100); // leave the default prot
-        kthread_args = kmem_alloc(sizeof(kproc_args));
+    uint64_t code_size = ROUND_PG(data_size);
+    uint64_t exec_code = kprim_kmem_alloc(&g_kp, code_size);
+    uint64_t kproc_name = kprim_kmem_alloc(&g_kp, ROUND_PG(0x100));
+    uint64_t kthread_args = kprim_kmem_alloc(&g_kp, ROUND_PG(sizeof(kproc_args)));
+
+    if (!exec_code || !kproc_name || !kthread_args) {
+        klog_puts("kldload: kmem_alloc failed");
+        return;
     }
 
-    #ifdef DEBUG
+// #ifdef DEBUG
+    klog_printf("kldload: code=%#lx (%zd bytes) name=%#lx args=%#lx\n",
+        exec_code, data_size, kproc_name, kthread_args);
+// #endif
 
-    printf("code size: %ld bytes\nExec code address: %#02lx\nkproc_name addr: %#02lx\n kthread_args: %#02lx\n", 
-        data_size, 
-        exec_code,
-        kproc_name,
-        kthread_args);
-    #endif
+    //
+    // Mark code pages executable (clear NX in kernel PTEs)
+    //
+    if (page_mark_exec(g_kp.dmap_base, g_kp.kernel_cr3, exec_code, code_size)) {
+        klog_puts("kldload: mark_exec failed");
+        return;
+    }
 
+    //
+    // Prepare kproc args (passed to kmod entry)
+    //
     payload_args_t* payload_args = payload_get_args();
     kproc_args args;
     args.kdata_base = payload_args->kdata_base_addr;
     args.fw_ver = fw_version;
 
     //
-    // Kernel write
-    // 
-    
-    puts("Writing data...");
+    // Write code, name, and args into kernel memory
+    //
+    klog_puts("kldload: writing payload to kernel...");
     kernel_copyin(data, exec_code, data_size);
     kernel_copyin(KTHREAD_NAME, kproc_name, sizeof(KTHREAD_NAME));
     kernel_copyin(&args, kthread_args, sizeof(args));
 
+#if DEBUG
+    // Readback verification
+    uint8_t dump[16] = {0};
+    kernel_copyout(exec_code, dump, sizeof(dump));
+    klog_printf("kldload: first 16 bytes: ");
+    for (int i = 0; i < 16; i++)
+        klog_printf("%02x ", dump[i]);
+    klog_puts("");
+#endif
 
-    printf("Lauching kthread at %#02lx...\n", exec_code);
+    //
+    // Launch kernel thread
+    //
+    klog_printf("kldload: launching kthread at %#lx...\n", exec_code);
 
-    if (kstuff_loaded)
-        kproc_create(exec_code, kthread_args, kproc_name);
-    else
-        r0gdb.r0gdb_kproc_create(exec_code, kthread_args, kproc_name);
+    int ret = kprim_kproc_create(&g_kp, exec_code, kthread_args, kproc_name);
+    klog_printf("kldload: kproc_create returned %d\n", ret);
+
+    if (!ret) 
+    {
+        klog_puts("kldload: module launched successfully");
+        notify_send("kldload: module loaded (%zd bytes)", data_size);
+    } 
+    else 
+    {
+        klog_puts("kldload: kproc_create FAILED");
+        notify_send("kldload: FAILED to load module");
+    }
 }
 
 
+// int main_test(int argc, char const *argv[])
+// {
+//     fw_version = get_fw_version();
+//     if (kprim_init(&g_kp, fw_version)) return 1;
+//     uint8_t ret_code[] = { 0xC3 };
+//     uint64_t code_size = ROUND_PG(sizeof(ret_code));
+//     uint64_t exec_code = kprim_kmem_alloc(&g_kp, code_size);
+//     if (!exec_code) return 1;
+//     if (page_mark_exec(g_kp.dmap_base, g_kp.kernel_cr3, exec_code, code_size)) return 1;
+//     kernel_copyin(ret_code, exec_code, sizeof(ret_code));
+//     kprim_kcall(&g_kp, exec_code, 0, 0, 0, 0, 0, 0);
+//     notify_send("works\n");
+//     kprim_cleanup(&g_kp);
+//     return 0;
+// }
+
 int main(int argc, char const *argv[])
 {
-    puts("Starting kldload...");
-    struct proc* existing_instance = find_proc_by_name(THREAD_NAME);
-    payload_args_t* args = payload_get_args();
     fw_version = get_fw_version();
+    klog_printf("Running on firmware %#x\n", fw_version);
 
-    if (existing_instance)
+    // kill previous instance if running
+    struct proc* existing = find_proc_by_name("kldload.elf");
+    if (existing && existing->pid != getpid())
     {
-        if (kill(existing_instance->pid, SIGKILL))
-        {
-            printf("Unable to kill %d\n", existing_instance->pid);
-            return 1;
-        }
+        klog_printf("kldload: killing previous instance (pid %d)\n", existing->pid);
+        kill(existing->pid, SIGKILL);
+        free(existing);
     }
 
-    kstuff_loaded = !kstuff_check();
-
-    if (kstuff_loaded && is_kstuff_unsupported())
+    // init kernel primitives
+    if (kprim_init(&g_kp, fw_version))
     {
-        char* err_msg = "The current kstuff build is not supported, unload kstuff before use! aborting kldload loading...";
-        puts(err_msg);
-        notify_send(err_msg);
-        return 1;
-    } 
-    else
-    {
-        load_r0gdb(&r0gdb);
-        if (r0gdb.r0gdb_init_ptr(args->sys_dynlib_dlsym, (int) args->rwpair[0], (int) args->rwpair[1], 0, args->kdata_base_addr))
-        {
-            notify_send("Failed to start r0gdb, aborting kldload loading...");
-            return 1;
-        }
-    }
-
-    
-    if (start_server(PORT, _kldload) <= 0)
-    {
-        notify_send("Unable to initialize kldload server on port %d! Aborting...", PORT);
+        klog_puts("kldload: kprim_init failed");
         return 1;
     }
 
-    // while (1);
+    // daemonize — detach from loader session
+    daemon(0, 0);
+
+    klog_printf("kldload ready\nStarting server on %d...\n", PORT);
+    notify_send("kldload ready at %d\n", PORT);
+    start_server(PORT, _kldload);
+    kprim_cleanup(&g_kp);
     return 0;
 }
