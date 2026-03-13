@@ -26,10 +26,7 @@ Currently supported firmware:
 - 5.02
 - 5.10
 - 5.50
-- 6.0 (Unstable) 
-- 6.02 (Unstable)
-- 6.50 (Unstable)
-
+- ~~6.X~~ (GMET) 
 
 # Building and Using
 
